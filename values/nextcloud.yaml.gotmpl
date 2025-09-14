@@ -1,0 +1,82 @@
+{{- $prodUrl := printf "%s.%s" .Release.Name .Values.prodDomainName -}}
+{{- $devUrl := printf "%s.%s" .Release.Name .Values.devDomainSuffix -}}
+
+nextcloud:
+  {{- if .Values.isProd }}
+  host: {{ $prodUrl }}
+  {{- else }}
+  host: {{ $devUrl }}
+  {{- end }}
+  existingSecret: 
+    enabled: true
+    secretName: nextcloud-credentials
+    usernameKey: ADMIN_NAME
+    passwordKey: ADMIN_PASSWORD
+  update: 1
+  {{- if .Values.isProd }}
+  trustedDomains:
+    - {{ $prodUrl }}
+  {{- end }}
+  extraEnv:
+    - name: OVERWRITEHOST
+      {{- if .Values.isProd }}
+      value: {{ $prodUrl }}
+    - name: OVERWRITEPROTOCOL
+      value: "https"
+    - name: OVERWRITECLIURL
+      # value: "https://nextcloud.rliance.work"
+      value: {{ printf "https://%s" $prodUrl }}
+      {{- else }}
+      value: {{ $devUrl }}
+      {{- end }}
+
+service:
+  type: ClusterIP
+  port: 80
+
+
+ingress:
+  enabled: true
+  {{- if .Values.isProd }}
+  className: traefik
+  {{- else }}
+  className: "ingress-controller"
+  {{- end }}
+
+  path: /
+  pathType: Prefix
+
+persistence:
+  enabled: true
+  size: 5Gi
+  accessMode: ReadWriteOnce
+
+
+internalDatabase:
+  enabled: false
+externalDatabase:
+  enabled: true
+  type: postgresql
+  database: nextcloud
+
+  existingSecret:
+    enabled: true
+    secretName: cloudnative-cluster-superuser
+    usernameKey: username
+    passwordKey: password
+    hostKey: uri
+
+
+
+# Resource limits
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+replicaCount: 1
+cronjob:
+  enabled: false

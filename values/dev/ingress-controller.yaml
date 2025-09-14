@@ -1,0 +1,21 @@
+controller:
+  kind: DaemonSet
+  hostPort:
+    enabled: true
+  daemonset:
+    useHostPort: true
+
+  replicaCount: 2
+
+  ingressClassResource:
+    name: ingress-controller
+    enabled: true
+  ingressClass: ingress-controller
+
+  metrics:
+    enabled: false
+    serviceMonitor:
+      enabled: false
+
+  service:
+    type: ClusterIP

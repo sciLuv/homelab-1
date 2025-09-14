@@ -1,0 +1,50 @@
+# applications:
+#   namespace: argo-cd
+#   sources:
+#     - repoURL: https://github.com/sciLuv/homelab-1
+#       targetRevision: HEAD
+#   destination:
+#     server: https://kubernetes.default.svc
+#     namespace: argo-cd
+
+
+#   syncPolicy:
+#     syncOptions:
+#       - CreateNamespace=true
+#     automated: { selfHeal: true, prune: true }
+
+
+# itemTemplates:
+#   - items:
+#       - name: test
+#         generator: &generators
+#           list:
+#             elements:
+#               - name: nextcloud
+#               - name: jitsi
+#               - name: argo-cd
+#     template:
+    
+applicationsets:
+  apps:
+    generators:
+      - list:
+          elements:
+            - { name: nextcloud }
+            - { name: jitsi }
+    template:
+      metadata:
+        name: test
+        namespace: argo-cd
+      spec:
+        project: default
+        source:
+          repoURL: https://github.com/sciLuv/homelab-1
+          path:  
+          targetRevision: HEAD
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: '{{.name}}'
+        syncPolicy:
+          automated: { prune: true, selfHeal: true }
+          syncOptions: [CreateNamespace=true]

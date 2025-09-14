@@ -1,0 +1,10 @@
+cloudflare:
+  account: "7e0900310ef49c14cec9ac9478d539e5"
+  tunnelName: "k3s-homelab"
+  tunnelId: "3d2e77cc-0010-48cc-b1f9-f86199ee7b9e"
+  secret: "Gc1yhY0gks7WT4/eSqRAmw5S+nquDpBcgJpUOqjpEH8="
+  ingress:
+    - hostname: rliance.work
+      service: http://traefik.kube-system.svc.cluster.local:80   
+    - hostname: nextcloud.rliance.work
+      service: http://traefik.kube-system.svc.cluster.local:80   

@@ -1,0 +1,117 @@
+global:
+  namespace: "openbao"
+
+## allow injection from openbao agent injection
+injector:
+  enabled: true
+  metrics:
+    enabled: true
+
+server:
+  enabled: true
+  statefulSet:
+    securityContext:
+      pod:
+        runAsNonRoot: false
+      container:
+        allowPrivilegeEscalation: true
+  ingress:
+    enabled: true
+    {{- if .Values.isProd }}
+    hosts: 
+      - host: {{ printf "%s.%s" "openbao" .Values.prodDomainName }}
+    ingressClassName: traefik
+    {{- else }}
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    hosts:
+      - host: {{ printf "%s.%s" "openbao" .Values.devDomainSuffix }}
+    ingressClassName: ingress-controller
+    {{- end }}
+    pathType: Prefix
+    paths:
+      - /
+
+
+  # in doc they said it's necessary for metrics
+  standalone:
+    config:
+      ui = true
+
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+        telemetry {
+          unauthenticated_metrics_access = "true"
+        }
+      }
+      storage "file" {
+        path = "/openbao/data"
+      }
+
+      telemetry {
+        prometheus_retention_time = "2m"
+        usage_gauge_period        = "30s"
+        maximum_gauge_cardinality = 1000
+        disable_hostname = true
+        filter_default            = true
+      }
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+
+  dataStorage:
+    enable: true
+    size: 2Gi
+    mountPath: "/openbao/data"
+    storageClass: retain-storage
+    accessMode: ReadWriteOnce
+
+  serviceAccount:
+    create: true
+    name: openbao-sa
+    serviceDiscovery:
+      enabled: true
+
+  extraContainers:
+    - name: openbao-init
+      image: quay.io/openbao/openbao:2.3.1
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        allowPrivilegeEscalation: true
+      command:
+        - /bin/sh
+        - -c
+        - |
+          apk add --no-cache bash curl jq grep coreutils \
+            && curl -LO https://dl.k8s.io/release/v1.30.1/bin/linux/amd64/kubectl \
+            && install -m 755 kubectl /usr/local/bin/kubectl
+          while true; do
+            /init-script/bootstrap-openbao.sh
+            /config-script/config-openbao.sh
+            echo "Cycle de vérification terminé, attente 60s..."
+            sleep 60
+          done
+      envFrom:
+        - secretRef:
+            name: openbao-init-vars
+      volumeMounts:
+        - name: init-script
+          mountPath: /init-script
+        - name: config-script
+          mountPath: /config-script
+        - name: output
+          mountPath: /output
+  volumes:
+    - name: init-script
+      configMap:
+        name: openbao-init-script
+        defaultMode: 0755
+    - name: config-script
+      configMap:
+        name: openbao-config-script
+        defaultMode: 0755
+    - name: output
+      emptyDir: {}

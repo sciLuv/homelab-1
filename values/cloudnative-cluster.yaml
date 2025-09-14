@@ -1,0 +1,8 @@
+cluster: 
+  instances: 1
+  bootstrap:
+    initdb:
+      database: nextcloud
+      owner: nextcloud
+
+      

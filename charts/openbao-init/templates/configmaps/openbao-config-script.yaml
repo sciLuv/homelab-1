@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openbao-config-script
+  namespace: openbao
+data:
+  config-openbao.sh: |
+    #!/bin/bash
+    set -e
+    set -x
+
+    # ------------------------------
+    # création of secrets 
+    # ------------------------------
+
+    bao secrets enable -address="$ADDRESS_OB" -path=kv kv-v2
+
+    bao kv put -address="$ADDRESS_OB" \
+      -mount=kv database/nextcloud/values \
+      USERNAME="..." \
+      PASSWORD="..." \
+
+    # ------------------------------
+    # créer une policy
+    # ------------------------------
+
+    # cat <<'EOF' | bao policy write -address="$ADDRESS_OB" n8n-access -
+    # path "kv/data/nocodb/values" {
+    #   capabilities = ["read"]
+    # }
+    # EOF
+    # cat <<'EOF' | bao policy write -address="$ADDRESS_OB" nocodb-access -
+    # path "kv/data/nocodb/values" {
+    #   capabilities = ["create", "update"]
+    # }
+    # EOF
+
+    # ------------------------------
+    # créer un acces kubernetes
+    # ------------------------------
+    
+    bao auth enable -address="$ADDRESS_OB" kubernetes || true
+
+    bao write -address="$ADDRESS_OB" auth/kubernetes/config \
+    token_reviewer_jwt=@/var/run/secrets/kubernetes.io/serviceaccount/token \
+    kubernetes_host="https://kubernetes.default.svc:443" \
+    kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+    # bao write -address="$ADDRESS_OB" auth/kubernetes/role/n8n \
+    #     bound_service_account_names=n8n-sa \
+    #     bound_service_account_namespaces=n8n \
+    #     policies=n8n-access \
+    #     ttl=1h
+
+    # bao write -address="$ADDRESS_OB" auth/kubernetes/role/nocodb \
+    #     bound_service_account_names=nocodb-sa \
+    #     bound_service_account_namespaces=nocodb \
+    #     policies=nocodb-access \
+    #     ttl=1h

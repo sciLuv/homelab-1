@@ -1,0 +1,5 @@
+apiVersion: v2
+name: crds
+version: 0.1.0
+description: CRDS for ArgoCD
+type: application

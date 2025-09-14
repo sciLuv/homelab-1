@@ -1,0 +1,36 @@
+global:
+  {{- if .Values.isProd }}
+  domain: {{ printf "%s.%s" .Release.Name .Values.prodDomainName }}
+  {{- else }}
+  domain: {{ printf "%s.%s" .Release.Name .Values.devDomainSuffix }}
+  {{- end }}
+  
+
+server:
+  service:
+    type: ClusterIP
+    servicePortHttp: 80
+  ingress:
+    enabled: true
+    ingressClassName: ingress-controller
+    annotations:
+      # nginx.ingress.kubernetes.io/rewrite-target: /
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    hostname: argo-cd.test
+    {{- if .Values.isProd }}
+    hostname: {{ printf "%s.%s" .Release.Name .Values.prodDomainName }}
+    {{- else }}
+    hostname: {{ printf "%s.%s" .Release.Name .Values.devDomainSuffix }}
+    {{- end }}
+    path: /
+    pathType: Prefix
+
+configs:
+  cm:
+    credentialTemplates: 
+      github:
+  params:
+    server.insecure: true
+
+

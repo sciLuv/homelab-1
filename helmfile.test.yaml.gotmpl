@@ -1,0 +1,189 @@
+environments:
+  default:
+    values:
+    - isProd: false
+    - devDomainSuffix: "test"
+    - prodDomainName: "rliance.work"
+# ----
+# defaults releases, with all desired running apps on our cluster
+# ----
+    - releases:
+        nextcloud:
+          enabled: true
+          labels:
+            env: default
+          name: "nextcloud"
+          chart: nextcloud/nextcloud
+          namespace: "nextcloud"
+          createNamespace: true
+          hooks:
+            - events: ["postsync"]
+              showlogs: true
+              command: "kubectl"
+              args: 
+                - "apply"
+                - "-f"
+                - "./manifests/secrets/nextcloud-credentials.yaml"
+        # jitsi:
+        #   enabled: true
+        #   labels:
+        #     env: default
+        #   name: "jitsi"
+        #   chart: jitsi/jitsi-meet
+        #   namespace: "jitsi"
+        #   createNamespace: true
+        argo-cd:
+          enabled: true
+          labels:
+            env: default
+          name: "argo-cd"
+          chart: argo/argo-cd
+          namespace: "argo-cd"
+          createNamespace: true
+        argo-cd-apps:
+          enabled: true
+          labels:
+            env: default
+          name: "argo-cd-apps"
+          chart: argo/argocd-apps
+          namespace: "argo-cd"
+          createNamespace: true
+        postgre-operator:
+          enabled: true
+          labels:
+            env: default
+          name: "postgre-operator"
+          chart: cnpg/cloudnative-pg
+          namespace: "databases"
+        postgre-db:
+          enabled: true
+          labels:
+            env: default
+          name: "postgre-db"
+          chart: cnpg/cluster
+          namespace: "databases"
+          createNamespace: true
+        openbao-init:
+          enabled: true
+          labels:
+            env: default
+          name: "openbao-init"
+          chart: charts/openbao-init
+          namespace: "openbao"
+        openbao: 
+          enabled: true
+          name: "openbao"
+          chart: openbao/openbao
+          version: 0.14.0
+          namespace: "openbao"
+          createNamespace: true
+# ----
+# specific releases for different environments
+# ----
+# prod environment (on K3S cluster)
+        cloudflare-tunnel:
+          enabled: true
+          labels:
+            env: prod
+          name: "cloudflare-tunnel"
+          chart: cloudflare/cloudflare-tunnel
+          namespace: "cloudflare-tunnel"
+          createNamespace: true
+# dev environment (on Kind cluster)
+        ingress-nginx:
+          enabled: true
+          labels:
+            env: dev
+          name: "ingress-controller"
+          chart: ingress-nginx/ingress-nginx
+          version: 4.12.3
+          namespace: "ingress-controller"
+          createNamespace: true
+          # values:
+          #   - ./values/dev/ingress-controller.yaml
+
+---
+
+helmDefaults:
+  wait: true
+
+repositories:
+  - name: ingress-nginx
+    url: https://kubernetes.github.io/ingress-nginx
+  - name: cloudflare
+    url: https://cloudflare.github.io/helm-charts
+  - name: nextcloud
+    url: https://nextcloud.github.io/helm/
+  - name: argo
+    url: https://argoproj.github.io/argo-helm
+  - name: jitsi
+    url: https://jitsi-contrib.github.io/jitsi-helm/
+  - name: cloudnative-pg
+    url: https://cloudnative-pg.github.io/charts
+  - name: openbao
+    url: https://openbao.github.io/openbao-helm
+
+{{ $releases := .Values.releases }}
+releases:
+{{ range $name, $release := $releases }}
+
+  - name: "{{ $name }}"
+    chart: {{ $release.chart }}
+    namespace: {{ $release.namespace }}
+    installed: {{ $release.enabled }}
+
+    {{- if hasKey $release "version" }}
+    version: {{ $release.version }}
+    {{- end }}
+
+  # labels:
+    {{- if hasKey $release "labels" }}
+    labels:
+    {{- $release.labels | toYaml | nindent 6 }}
+    {{- end }}
+
+  # hooks:
+    {{- if hasKey $release "hooks" }}
+    hooks:
+    {{- $release.hooks | toYaml | nindent 6 }}
+    {{- end }}
+
+  # values:
+    values:
+    {{- if isFile (printf "values/%s.yaml" $release.name) }}
+      - values/{{ $release.name }}.yaml
+    {{- end }}
+    {{- if isFile (printf "values/%s.yaml.gotmpl" $release.name) }}
+      - values/{{ $release.name }}.yaml.gotmpl
+    {{- end }}
+    
+    {{- if isFile (printf "values/prod/%s.yaml" $release.name) }}
+      - values/prod/{{ $release.name }}.yaml
+    {{- end }}
+    {{- if isFile (printf "values/prod/%s.yaml.gotmpl" $release.name) }}
+      - values/prod/{{ $release.name }}.yaml.gotmpl
+    {{- end }}
+
+    {{- if isFile (printf "values/dev/%s.yaml" $release.name) }}
+      - values/dev/{{ $release.name }}.yaml
+    {{- end }}
+    {{- if isFile (printf "values/dev/%s.yaml.gotmpl" $release.name) }}
+      - values/dev/{{ $release.name }}.yaml.gotmpl
+    {{- end }}
+
+    {{- if hasKey $release "values" }}
+    {{- if $release.values }}
+    {{- range $release.values }}
+      - {{ . }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+  # needs
+    needs:
+    {{if eq $name "argo-cd-apps"}}
+      - argo-cd/argo-cd
+    {{ end }}
+
+
+{{ end }}
