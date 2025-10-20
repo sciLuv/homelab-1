@@ -2,6 +2,8 @@ configurations files linked with my homelab kubernetes cluster management.
 use helm and helmfile.
 "dev" env run under Kind cluster, "prod" one under k3s, 
 
+no bitnami chart inside.
+
 more details will come after.
 
 
