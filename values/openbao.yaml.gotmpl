@@ -34,29 +34,29 @@ server:
 
 
   # in doc they said it's necessary for metrics
-  standalone:
-    config:
-      ui = true
+  # standalone:
+  #   config:
+  #     ui = true
 
-      listener "tcp" {
-        tls_disable = 1
-        address = "[::]:8200"
-        cluster_address = "[::]:8201"
-        telemetry {
-          unauthenticated_metrics_access = "true"
-        }
-      }
-      storage "file" {
-        path = "/openbao/data"
-      }
+  #     listener "tcp" {
+  #       tls_disable = 1
+  #       address = "[::]:8200"
+  #       cluster_address = "[::]:8201"
+  #       telemetry {
+  #         unauthenticated_metrics_access = "true"
+  #       }
+  #     }
+  #     storage "file" {
+  #       path = "/openbao/data"
+  #     }
 
-      telemetry {
-        prometheus_retention_time = "2m"
-        usage_gauge_period        = "30s"
-        maximum_gauge_cardinality = 1000
-        disable_hostname = true
-        filter_default            = true
-      }
+  #     telemetry {
+  #       prometheus_retention_time = "2m"
+  #       usage_gauge_period        = "30s"
+  #       maximum_gauge_cardinality = 1000
+  #       disable_hostname = true
+  #       filter_default            = true
+  #     }
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
@@ -65,7 +65,7 @@ server:
     enable: true
     size: 2Gi
     mountPath: "/openbao/data"
-    storageClass: retain-storage
+    # storageClass: retain-storage
     accessMode: ReadWriteOnce
 
   serviceAccount:

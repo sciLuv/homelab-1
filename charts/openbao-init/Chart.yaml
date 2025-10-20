@@ -1,4 +1,4 @@
-apiVersion: v2
-name: crds
+apiVersion: v1
+name: openbao-init
 version: 0.1.0
 description: OpenBao initialization

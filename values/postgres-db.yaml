@@ -1,0 +1,39 @@
+cluster: 
+  instances: 1
+  initdb:
+    database: nextcloud
+    owner: nextcloud
+    postInitSQL:
+      - CREATE EXTENSION IF NOT EXISTS vector;
+  # serviceAccountTemplate:
+  #   metadata:
+  #     name: postgre-db-sa
+  #     labels:
+  #       app: postgresql
+  #     annotations:
+  #       vault.hashicorp.com/role: "nextcloud-db"
+  storage:
+    size: 4Gi
+
+  resources:
+    # ressources garanties 
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    # ressources maximum  
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  roles: 
+    - name: nextcloud
+      ensure: present
+      comment: Nextcloud Database User
+      login: true
+      superuser: false
+      passwordSecret:
+        name: db-nextcloud-user
+
+  postgresql:
+    pg_hba:
+      - hostssl all all 10.244.0.0/16 scram-sha-256

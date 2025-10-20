@@ -1,0 +1,4 @@
+apiVersion: v1
+name: postgres-init
+version: 0.1.0
+description: cloudnative postgres initialization

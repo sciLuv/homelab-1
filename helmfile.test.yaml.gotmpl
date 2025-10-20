@@ -8,6 +8,14 @@ environments:
 # defaults releases, with all desired running apps on our cluster
 # ----
     - releases:
+        nextcloud-init:
+          enabled: true
+          labels:
+            env: default
+          name: "nextcloud-init"
+          chart: charts/nextcloud-init
+          namespace: "nextcloud"
+          createNamespace: true
         nextcloud:
           enabled: true
           labels:
@@ -16,14 +24,6 @@ environments:
           chart: nextcloud/nextcloud
           namespace: "nextcloud"
           createNamespace: true
-          hooks:
-            - events: ["postsync"]
-              showlogs: true
-              command: "kubectl"
-              args: 
-                - "apply"
-                - "-f"
-                - "./manifests/secrets/nextcloud-credentials.yaml"
         # jitsi:
         #   enabled: true
         #   labels:
@@ -33,7 +33,7 @@ environments:
         #   namespace: "jitsi"
         #   createNamespace: true
         argo-cd:
-          enabled: true
+          enabled: false
           labels:
             env: default
           name: "argo-cd"
@@ -41,25 +41,34 @@ environments:
           namespace: "argo-cd"
           createNamespace: true
         argo-cd-apps:
-          enabled: true
+          enabled: false
           labels:
             env: default
           name: "argo-cd-apps"
           chart: argo/argocd-apps
           namespace: "argo-cd"
           createNamespace: true
-        postgre-operator:
+        postgres-db-init:
           enabled: true
           labels:
             env: default
-          name: "postgre-operator"
+          name: "postgres-db-init"
+          chart: charts/postgres-db-init
+          namespace: "databases"
+          createNamespace: true
+        postgres-operator:
+          enabled: true
+          labels:
+            env: default
+          name: "postgres-operator"
           chart: cnpg/cloudnative-pg
           namespace: "databases"
-        postgre-db:
+          createNamespace: true
+        postgres-db:
           enabled: true
           labels:
             env: default
-          name: "postgre-db"
+          name: "postgres-db"
           chart: cnpg/cluster
           namespace: "databases"
           createNamespace: true
@@ -70,13 +79,17 @@ environments:
           name: "openbao-init"
           chart: charts/openbao-init
           namespace: "openbao"
+          createNamespace: true
         openbao: 
           enabled: true
+          labels:
+            env: default
           name: "openbao"
           chart: openbao/openbao
           version: 0.14.0
           namespace: "openbao"
           createNamespace: true
+
 # ----
 # specific releases for different environments
 # ----
@@ -90,7 +103,7 @@ environments:
           namespace: "cloudflare-tunnel"
           createNamespace: true
 # dev environment (on Kind cluster)
-        ingress-nginx:
+        ingress-controller:
           enabled: true
           labels:
             env: dev
@@ -99,8 +112,6 @@ environments:
           version: 4.12.3
           namespace: "ingress-controller"
           createNamespace: true
-          # values:
-          #   - ./values/dev/ingress-controller.yaml
 
 ---
 
@@ -184,6 +195,27 @@ releases:
     {{if eq $name "argo-cd-apps"}}
       - argo-cd/argo-cd
     {{ end }}
+    {{if eq $name "openbao"}}
+      - openbao/openbao-init
+    {{ end }}
+    {{if eq $name "postgres-operator"}}
+      - databases/postgres-db-init
+    {{ end }}
+    {{if eq $name "postgres-db"}}
+      - databases/postgres-operator
+    {{ end }}
+    {{if eq $name "nextcloud"}}
+      - databases/postgres-db
+    {{ end }}
+    {{if eq $name "nextcloud"}}
+      - nextcloud/nextcloud-init
+    {{ end }}
+    {{- if and (ne $name "openbao") (ne $name "openbao-init") (ne $name "cloudflare-tunnel") (ne $name "ingress-controller")}}
+      - openbao/openbao
+    {{- end }}
+    # {{- if ne $name "ingress-controller"}}
+    #   - ingress-controller/ingress-controller
+    # {{- end }}
 
 
 {{ end }}

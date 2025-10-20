@@ -1,17 +1,42 @@
 {{- $prodUrl := printf "%s.%s" .Release.Name .Values.prodDomainName -}}
 {{- $devUrl := printf "%s.%s" .Release.Name .Values.devDomainSuffix -}}
 
+podAnnotations: 
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "nextcloud"
+  vault.hashicorp.com/agent-inject-secret-db: "kv/data/database/nextcloud/values"
+  vault.hashicorp.com/agent-inject-secret-creds: "kv/data/nextcloud/credentials/values"
+  vault.hashicorp.com/agent-inject-file-env: "creds.env"
+  vault.hashicorp.com/agent-inject-template-env: |
+    {{`{{- with secret "kv/data/database/nextcloud/values" -}}`}}
+    {{`{{- if .Data.data -}}`}}
+    {{`{{- range $k, $v := .Data.data -}}`}}
+    {{`{{ $k }}={{ $v }}`}}
+    {{`{{- "\n" -}}`}}
+    {{`{{- end -}}`}}
+    {{`{{- end -}}`}}
+    {{`{{- end -}}`}}
+
+    {{`{{- with secret "kv/data/nextcloud/credentials/values" -}}`}}
+    {{`{{- if .Data.data -}}`}}
+    {{`{{- range $k, $v := .Data.data -}}`}}
+    {{`{{ $k }}={{ $v }}`}}
+    {{`{{- "\n" -}}`}}
+    {{`{{- end -}}`}}
+    {{`{{- end -}}`}}
+    {{`{{- end -}}`}}
+
 nextcloud:
   {{- if .Values.isProd }}
   host: {{ $prodUrl }}
   {{- else }}
   host: {{ $devUrl }}
   {{- end }}
-  existingSecret: 
-    enabled: true
-    secretName: nextcloud-credentials
-    usernameKey: ADMIN_NAME
-    passwordKey: ADMIN_PASSWORD
+  # existingSecret: 
+  #   enabled: true
+  #   secretName: nextcloud-credentials
+  #   usernameKey: ADMIN_NAME
+  #   passwordKey: ADMIN_PASSWORD
   update: 1
   {{- if .Values.isProd }}
   trustedDomains:
@@ -29,6 +54,89 @@ nextcloud:
       {{- else }}
       value: {{ $devUrl }}
       {{- end }}
+  extraSidecarContainers: 
+    - name: nextcloud-cron
+      # image: busybox:stable
+      image: nextcloud:apache
+      imagePullPolicy: IfNotPresent
+      # command: ["/bin/sh","-c"]
+      # args: ["tail -f /dev/null"]
+      command: ["/bin/bash", "-lc"]
+      args:
+      - |
+        set -e
+        echo "[sidecar] bootstrap starting..."
+
+        # rendre exécutables
+        [ -d /bootstrap-db ]   && chmod +x /bootstrap-db/*.sh 2>/dev/null || true
+        [ -d /bootstrap-user ] && chmod +x /bootstrap-user/*.sh 2>/dev/null || true
+
+        # 1) DB + installation si besoin
+        if [ -x /bootstrap-db/db-config.sh ]; then
+          echo "[sidecar] running /bootstrap-db/db-config.sh"
+          /bootstrap-db/db-config.sh || echo "[WARN] db-config.sh a retourné une erreur"
+        else
+          echo "[sidecar] /bootstrap-db/db-config.sh absent (ok)"
+        fi
+
+        # 2) Users (delete admin, create user, etc.)
+        if [ -x /bootstrap-user/user-config.sh ]; then
+          echo "[sidecar] running /bootstrap-user/user-config.sh"
+          /bootstrap-user/user-config.sh || echo "[WARN] user-config.sh a retourné une erreur"
+        else
+          echo "[sidecar] /bootstrap-user/user-config.sh absent (ok)"
+        fi
+
+        echo "[sidecar] bootstrap done. Tailing logs..."
+        tail -f /dev/null
+      volumeMounts:
+      # - name: nextcloud-main
+        # mountPath: /mnt/nc/html/config
+        # mountPath: /var/www/html
+      - name: nextcloud-main
+        mountPath: /var/www/html
+        subPath: html
+        readOnly: false
+      - name: nextcloud-main
+        mountPath: /var/www/html/config
+        subPath: config
+      - name: nextcloud-main
+        mountPath: /var/www/html/data
+        subPath: data
+      - name: nextcloud-main
+        mountPath: /var/www/html/custom_apps
+        subPath: custom_apps
+      - name: nextcloud-main
+        mountPath: /var/www/html/themes
+        subPath: themes
+      - name: nextcloud-user-credentials
+        mountPath: /bootstrap-user
+      - name: nextcloud-db-credentials
+        mountPath: /bootstrap-db
+        
+        readOnly: false
+      # resources:
+      #   requests:
+      #     cpu: 10m
+      #     memory: 32Mi
+      #   limits:
+      #     cpu: 100m
+      #     memory: 128Mi
+
+  extraVolumes:
+    - name: nextcloud-user-credentials
+      configMap:
+        name: nextcloud-user-credentials
+        defaultMode: 0755          
+    - name: nextcloud-db-credentials
+      configMap:
+        name: nextcloud-db-credentials
+        defaultMode: 0755          
+
+  # extraVolumeMounts:
+  #   - name: nc-bootstrap
+  #     mountPath: /bootstrap        # /bootstrap/run.sh dans le conteneur Nextcloud
+
 
 service:
   type: ClusterIP
@@ -59,14 +167,12 @@ externalDatabase:
   type: postgresql
   database: nextcloud
 
-  existingSecret:
-    enabled: true
-    secretName: cloudnative-cluster-superuser
-    usernameKey: username
-    passwordKey: password
-    hostKey: uri
-
-
+  # existingSecret:
+  #   enabled: true
+  #   secretName: nextcloud-credentials-db
+  #   usernameKey: username
+  #   passwordKey: password
+  #   hostKey: uri
 
 # Resource limits
 resources:
@@ -80,3 +186,9 @@ resources:
 replicaCount: 1
 cronjob:
   enabled: false
+
+rbac:
+  enabled: true
+  serviceaccount:
+    create: true
+    name: nextcloud-sa

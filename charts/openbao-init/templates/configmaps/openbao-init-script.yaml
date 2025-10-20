@@ -1,0 +1,129 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openbao-init-script
+  namespace: openbao
+data:
+  bootstrap-openbao.sh: |
+    #!/bin/bash
+    set -e
+    set -x
+
+    # Attente que le service OpenBao soit accessible
+      if bao status -address="$ADDRESS_OB" | grep -q "Sealed"; then
+        echo -e "Service OpenBao accessible. Démarrage de l'initialisation...\n"
+      else
+        echo -e "Service OpenBao inaccessible. Vérifiez l'état du service\n"
+        exit 1
+      fi
+
+    # Vérification de l'existance ou non du secret au démarrage ---
+    if kubectl get secret openbao-init-result -n openbao >/dev/null 2>&1; then
+      echo -e "Secret 'openbao-init-result' déjà présent. Récupération des données d'initialisation...\n"
+      kubectl get secret openbao-init-result -n openbao -o jsonpath='{.data.init\.json}' \
+        | base64 -d > /output/init.json
+      echo -e "Données d'initialisation récupérées depuis le Secret existant.\n"
+    else
+      echo -e "Secret 'openbao-init-result' absent. Initialisation d'OpenBao...\n"
+    fi
+
+    # Vérification de l'initialisation du service
+    echo "Vérification de l'initialisation du service OpenBao..."
+    if [ "$(bao status -address="$ADDRESS_OB" -format=json | jq -r '.initialized')" = "false" ]; then
+      echo "OpenBao n'est pas initialisé : initialisation en cours (5 partages, seuil 3)..."
+      bao operator init \
+        -address="$ADDRESS_OB" \
+        -key-shares=5 \
+        -key-threshold=3 \
+        -format=json > /output/init.json
+      echo "Initialisation d'OpenBao terminée. (/output/init.json généré)"
+    else
+      echo "OpenBao déjà initialisé, passage à l'étape suivante."
+    fi
+
+    # Vérification de l'existence et de la disponibilité du fichier d'initialisation
+    echo "Vérification de l'existence du fichier d'initialisation..."
+    if [ ! -f /output/init.json ]; then
+            echo "le fichier d'initialisation n'est pas disponible. Impossible de déverrouiller."
+            exit 1
+    else
+            echo "Fichier d'initialisation trouvé : /output/init.json"
+    fi
+
+    # Vérification de l'état sealed du service
+    echo "Vérification si le service est scellé..."
+    if [ "$(bao status -address="$ADDRESS_OB" -format=json | jq -r '.sealed')" = "true" ]; then
+      echo -e "Service OpenBao scellé : déverrouillage (unseal) en cours avec les clés...\n"
+      # Utilisation des 3 clés de déverrouillage depuis /output/init.json
+      cat /output/init.json | jq -r '.unseal_keys_b64[0]' | xargs -I{} bao operator unseal -address="$ADDRESS_OB" {}
+      cat /output/init.json | jq -r '.unseal_keys_b64[1]' | xargs -I{} bao operator unseal -address="$ADDRESS_OB" {}
+      cat /output/init.json | jq -r '.unseal_keys_b64[2]' | xargs -I{} bao operator unseal -address="$ADDRESS_OB" {}
+      echo -e "Service OpenBao déverrouillé.\n"
+    else
+      echo -e "Service OpenBao déjà déverrouillé, étape ignorée.\n"
+    fi
+
+    # Connexion root (vérifier si on est déjà connecté en root)
+    echo -e "Vérification de la connexion root...\n"
+    if ! bao read -address="$ADDRESS_OB" auth/userpass/users/"$ADMIN_NAME" > /dev/null 2>&1; then
+      echo -e "root non connecté. Connexion avec le jeton root...\n"
+      ROOT_TOKEN=$(jq -r '.root_token' < /output/init.json)
+      bao login -address="$ADDRESS_OB" "$ROOT_TOKEN"
+      echo -e "Connexion en tant que root réussie.\n"
+    else
+      echo -e "root déjà connecté.\n"
+    fi
+
+    # Vérification de l'existence de l'utilisateur admin
+    echo -e "Vérification de l'existence de l'utilisateur administrateur '$ADMIN_NAME'...\n"
+    if bao read -address="$ADDRESS_OB" auth/userpass/users/"$ADMIN_NAME" | grep -q "policies"; then
+      echo -e "l'utilisateur '$ADMIN_NAME' est bien présent dans OpenBao.\n"
+    else
+      echo -e "L'utilisateur '$ADMIN_NAME' n'existe pas. Création en cours...\n"
+
+      # Activation de la méthode d'authentification userpass si nécessaire
+      echo "Vérification de la méthode d'authentification 'userpass'..."
+      if [ "$(bao auth list -address="$ADDRESS_OB" -format=json | jq -r '.["userpass/"]')" = "null" ]; then
+        echo "Activation de l'authentification par mot de passe (userpass)..."
+        bao auth enable -address="$ADDRESS_OB" userpass
+        echo "Méthode 'userpass' activée."
+      else
+        echo "La méthode 'userpass' est déjà activée."
+      fi
+
+      # Création de la politique d'administration si nécessaire
+      echo "Vérification de l'existence de la politique 'admin-policy'..."
+      if ! bao policy read -address="$ADDRESS_OB" admin-policy > /dev/null 2>&1; then
+        echo "Création de la politique d'administration 'admin-policy'..."
+        echo 'path "*" {
+          capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+        }' | bao policy write -address="$ADDRESS_OB" admin-policy -
+
+        echo "Politique 'admin-policy' créée."
+      else
+        echo "La politique 'admin-policy' existe déjà."
+      fi
+
+      # Création de l'utilisateur admin
+      echo "Vérification de l'utilisateur administrateur '$ADMIN_NAME'..."
+      if ! bao read -address="$ADDRESS_OB" auth/userpass/users/"$ADMIN_NAME" > /dev/null 2>&1; then
+        echo "Création de l'utilisateur administrateur '$ADMIN_NAME'..."
+        bao write -address="$ADDRESS_OB" auth/userpass/users/"$ADMIN_NAME" \
+          password="$ADMIN_PSW" \
+          policies=admin-policy
+        echo "Utilisateur '$ADMIN_NAME' créé avec le rôle administrateur."
+      else
+        echo "L'utilisateur '$ADMIN_NAME' existe déjà."
+      fi
+
+    fi
+
+    # Mise à jour des Secret en lien avec l'initialisation en fin de script ---
+    if [ -f /output/init.json ]; then
+      echo "Stockage du fichier d'initialisation dans le Secret Kubernetes 'openbao-init-result'..."
+      kubectl create secret generic openbao-init-result \
+        --from-file=init.json=/output/init.json \
+        --namespace openbao \
+        --dry-run=client -o yaml | kubectl apply -f -
+      echo "Secret Kubernetes 'openbao-init-result' créé/mis à jour avec succès."
+    fi

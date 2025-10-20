@@ -17,23 +17,27 @@ data:
 
     bao kv put -address="$ADDRESS_OB" \
       -mount=kv database/nextcloud/values \
-      USERNAME="..." \
-      PASSWORD="..." \
+      NEXTCLOUD_DATABSE_USERNAME="nextcloud" \
+      NEXTCLOUD_DATABSE_PASSWORD="nextcloud" \
+      NEXTCLOUD_DATABSE_HOST="postgres-db-cluster-rw.databases.svc.cluster.local:5432" \
+    
+    bao kv put -address="$ADDRESS_OB" \
+      -mount=kv nextcloud/credentials/values \
+      NEXTCLOUD_USERNAME="admin" \
+      NEXTCLOUD_PASSWORD="admin123TTVFREddfghdfghdfghdfghdfgh" \
 
     # ------------------------------
     # créer une policy
     # ------------------------------
 
-    # cat <<'EOF' | bao policy write -address="$ADDRESS_OB" n8n-access -
-    # path "kv/data/nocodb/values" {
-    #   capabilities = ["read"]
-    # }
-    # EOF
-    # cat <<'EOF' | bao policy write -address="$ADDRESS_OB" nocodb-access -
-    # path "kv/data/nocodb/values" {
-    #   capabilities = ["create", "update"]
-    # }
-    # EOF
+    cat <<'EOF' | bao policy write -address="$ADDRESS_OB" nextcloud-access -
+    path "kv/data/database/nextcloud/values" {
+      capabilities = ["read"]
+    }
+    path "kv/data/nextcloud/credentials/values" {
+    capabilities = ["read"]
+    }
+    EOF
 
     # ------------------------------
     # créer un acces kubernetes
@@ -46,11 +50,11 @@ data:
     kubernetes_host="https://kubernetes.default.svc:443" \
     kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
-    # bao write -address="$ADDRESS_OB" auth/kubernetes/role/n8n \
-    #     bound_service_account_names=n8n-sa \
-    #     bound_service_account_namespaces=n8n \
-    #     policies=n8n-access \
-    #     ttl=1h
+    bao write -address="$ADDRESS_OB" auth/kubernetes/role/nextcloud \
+        bound_service_account_names=nextcloud-sa \
+        bound_service_account_namespaces=nextcloud \
+        policies=nextcloud-access \
+        ttl=1h
 
     # bao write -address="$ADDRESS_OB" auth/kubernetes/role/nocodb \
     #     bound_service_account_names=nocodb-sa \

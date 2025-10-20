@@ -5,17 +5,21 @@ controller:
   daemonset:
     useHostPort: true
 
-  replicaCount: 2
+  replicaCount: 1
 
+  ## Solution provisoire pour le bug de l'Ingress NGINX 
+  admissionWebhooks:
+    failurePolicy: Ignore
+    
   ingressClassResource:
     name: ingress-controller
     enabled: true
   ingressClass: ingress-controller
 
-  metrics:
-    enabled: false
-    serviceMonitor:
-      enabled: false
+  # metrics:
+  #   enabled: false
+  #   serviceMonitor:
+  #     enabled: false
 
   service:
     type: ClusterIP
