@@ -1,0 +1,38 @@
+namespaces:
+  - nextcloud
+  - databases
+
+storeRef: fake-store
+
+externals:
+  - name: nextcloud-credentials
+    namespace: nextcloud
+    targetName: nextcloud-credentials
+    refreshInterval: 15m
+    dataFrom:
+      extract:
+        key: secret/nextcloud-credentials
+
+  - name: nextcloud-db
+    namespace: nextcloud
+    targetName: nextcloud-db
+    refreshInterval: 15m
+    dataFrom:
+      extract:
+        key: secret/nextcloud-db
+
+  - name: db-nextcloud-user
+    namespace: databases 
+    targetName: db-nextcloud-user
+    refreshInterval: 15m
+    dataFrom:
+      extract:
+        key: secret/db-nextcloud-user
+
+  - name: openbao-init-vars
+    namespace: openbao 
+    targetName: openbao-init-vars
+    refreshInterval: 15m
+    dataFrom:
+      extract:
+        key: secret/openbao-init-vars

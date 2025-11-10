@@ -8,14 +8,6 @@ environments:
 # defaults releases, with all desired running apps on our cluster
 # ----
     - releases:
-        nextcloud-init:
-          enabled: true
-          labels:
-            env: default
-          name: "nextcloud-init"
-          chart: charts/nextcloud-init
-          namespace: "nextcloud"
-          createNamespace: true
         nextcloud:
           enabled: true
           labels:
@@ -48,13 +40,32 @@ environments:
           chart: argo/argocd-apps
           namespace: "argo-cd"
           createNamespace: true
-        postgres-db-init:
+        external-secrets:
           enabled: true
           labels:
             env: default
-          name: "postgres-db-init"
-          chart: charts/postgres-db-init
-          namespace: "databases"
+          name: "external-secrets"
+          chart: external-secrets/external-secrets
+          namespace: "external-secrets"
+          createNamespace: true
+          hooks:
+            - events: ["postsync"]
+              command: kubectl
+              args:
+                - wait
+                - --for=condition=Established
+                - --timeout=180s
+                - crd/externalsecrets.external-secrets.io
+                - crd/secretstores.external-secrets.io
+                - crd/clustersecretstores.external-secrets.io
+                - crd/clusterexternalsecrets.external-secrets.io
+        secrets-bundle: 
+          enabled: true
+          labels:
+            env: default
+          name: "secrets-bundle"
+          chart: charts/secrets-bundle
+          namespace: "external-secrets"
           createNamespace: true
         postgres-operator:
           enabled: true
@@ -89,7 +100,6 @@ environments:
           version: 0.14.0
           namespace: "openbao"
           createNamespace: true
-
 # ----
 # specific releases for different environments
 # ----
@@ -131,6 +141,8 @@ repositories:
     url: https://jitsi-contrib.github.io/jitsi-helm/
   - name: cloudnative-pg
     url: https://cloudnative-pg.github.io/charts
+  - name: jetstack
+    url: https://charts.jetstack.io
   - name: openbao
     url: https://openbao.github.io/openbao-helm
 
@@ -199,23 +211,22 @@ releases:
       - openbao/openbao-init
     {{ end }}
     {{if eq $name "postgres-operator"}}
-      - databases/postgres-db-init
+      - external-secrets/secrets-bundle
     {{ end }}
     {{if eq $name "postgres-db"}}
       - databases/postgres-operator
     {{ end }}
     {{if eq $name "nextcloud"}}
       - databases/postgres-db
-    {{ end }}
-    {{if eq $name "nextcloud"}}
-      - nextcloud/nextcloud-init
+      - external-secrets/secrets-bundle
     {{ end }}
     {{- if and (ne $name "openbao") (ne $name "openbao-init") (ne $name "cloudflare-tunnel") (ne $name "ingress-controller")}}
       - openbao/openbao
     {{- end }}
-    # {{- if ne $name "ingress-controller"}}
-    #   - ingress-controller/ingress-controller
-    # {{- end }}
+    {{if eq $name "secrets-bundle"}}
+      - external-secrets
+    {{ end }}
+
 
 
 {{ end }}

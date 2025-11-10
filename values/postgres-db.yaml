@@ -5,13 +5,6 @@ cluster:
     owner: nextcloud
     postInitSQL:
       - CREATE EXTENSION IF NOT EXISTS vector;
-  # serviceAccountTemplate:
-  #   metadata:
-  #     name: postgre-db-sa
-  #     labels:
-  #       app: postgresql
-  #     annotations:
-  #       vault.hashicorp.com/role: "nextcloud-db"
   storage:
     size: 4Gi
 

@@ -18,7 +18,7 @@ server:
   ingress:
     enabled: true
     {{- if .Values.isProd }}
-    hosts: 
+    hosts:
       - host: {{ printf "%s.%s" "openbao" .Values.prodDomainName }}
     ingressClassName: traefik
     {{- else }}
@@ -90,7 +90,7 @@ server:
             && install -m 755 kubectl /usr/local/bin/kubectl
           while true; do
             /init-script/bootstrap-openbao.sh
-            /config-script/config-openbao.sh
+            # /config-script/config-openbao.sh
             echo "Cycle de vérification terminé, attente 60s..."
             sleep 60
           done
@@ -100,8 +100,8 @@ server:
       volumeMounts:
         - name: init-script
           mountPath: /init-script
-        - name: config-script
-          mountPath: /config-script
+        # - name: config-script
+        #   mountPath: /config-script
         - name: output
           mountPath: /output
   volumes:
@@ -109,9 +109,9 @@ server:
       configMap:
         name: openbao-init-script
         defaultMode: 0755
-    - name: config-script
-      configMap:
-        name: openbao-config-script
-        defaultMode: 0755
+    # - name: config-script
+    #   configMap:
+    #     name: openbao-config-script
+    #     defaultMode: 0755
     - name: output
       emptyDir: {}

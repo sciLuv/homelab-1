@@ -1,63 +1,69 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: openbao-config-script
-  namespace: openbao
-data:
-  config-openbao.sh: |
-    #!/bin/bash
-    set -e
-    set -x
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: openbao-config-script
+#   namespace: openbao
+# data:
+#   config-openbao.sh: |
+#     #!/bin/bash
+#     set -e
+#     set -x
 
-    # ------------------------------
-    # création of secrets 
-    # ------------------------------
+#     # ------------------------------
+#     # création of secrets 
+#     # ------------------------------
 
-    bao secrets enable -address="$ADDRESS_OB" -path=kv kv-v2
+#     bao secrets enable -address="$ADDRESS_OB" -path=kv kv-v2
 
-    bao kv put -address="$ADDRESS_OB" \
-      -mount=kv database/nextcloud/values \
-      NEXTCLOUD_DATABSE_USERNAME="nextcloud" \
-      NEXTCLOUD_DATABSE_PASSWORD="nextcloud" \
-      NEXTCLOUD_DATABSE_HOST="postgres-db-cluster-rw.databases.svc.cluster.local:5432" \
+#     bao kv put -address="$ADDRESS_OB" \
+#       -mount=kv database/nextcloud/values \
+#       NEXTCLOUD_DATABSE_USERNAME="nextcloud" \
+#       NEXTCLOUD_DATABSE_PASSWORD="nextcloud" \
+#       NEXTCLOUD_DATABSE_HOST="postgres-db-cluster-rw.databases.svc.cluster.local:5432" \
     
-    bao kv put -address="$ADDRESS_OB" \
-      -mount=kv nextcloud/credentials/values \
-      NEXTCLOUD_USERNAME="admin" \
-      NEXTCLOUD_PASSWORD="admin123TTVFREddfghdfghdfghdfghdfgh" \
+#     bao kv put -address="$ADDRESS_OB" \
+#       -mount=kv nextcloud/credentials/values \
+#       NEXTCLOUD_USERNAME="admin" \
+#       NEXTCLOUD_PASSWORD="admin123TTVFREddfghdfghdfghdfghdfgh" \
 
-    # ------------------------------
-    # créer une policy
-    # ------------------------------
+#     # ------------------------------
+#     # créer une policy
+#     # ------------------------------
 
-    cat <<'EOF' | bao policy write -address="$ADDRESS_OB" nextcloud-access -
-    path "kv/data/database/nextcloud/values" {
-      capabilities = ["read"]
-    }
-    path "kv/data/nextcloud/credentials/values" {
-    capabilities = ["read"]
-    }
-    EOF
+#     cat <<'EOF' | bao policy write -address="$ADDRESS_OB" nextcloud-access -
+#     path "kv/data/database/nextcloud/values" {
+#       capabilities = ["read"]
+#     }
+#     path "kv/data/nextcloud/credentials/values" {
+#     capabilities = ["read"]
+#     }
+#     EOF
 
-    # ------------------------------
-    # créer un acces kubernetes
-    # ------------------------------
+#     cat <<'EOF' | bao policy write -address="$ADDRESS_OB" databases-access -
+#     path "kv/data/database/nextcloud/values" {
+#       capabilities = ["read"]
+#     }
+#     EOF
+
+#     # ------------------------------
+#     # créer un acces kubernetes
+#     # ------------------------------
     
-    bao auth enable -address="$ADDRESS_OB" kubernetes || true
+#     bao auth enable -address="$ADDRESS_OB" kubernetes || true
 
-    bao write -address="$ADDRESS_OB" auth/kubernetes/config \
-    token_reviewer_jwt=@/var/run/secrets/kubernetes.io/serviceaccount/token \
-    kubernetes_host="https://kubernetes.default.svc:443" \
-    kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+#     bao write -address="$ADDRESS_OB" auth/kubernetes/config \
+#     token_reviewer_jwt=@/var/run/secrets/kubernetes.io/serviceaccount/token \
+#     kubernetes_host="https://kubernetes.default.svc:443" \
+#     kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
-    bao write -address="$ADDRESS_OB" auth/kubernetes/role/nextcloud \
-        bound_service_account_names=nextcloud-sa \
-        bound_service_account_namespaces=nextcloud \
-        policies=nextcloud-access \
-        ttl=1h
+#     bao write -address="$ADDRESS_OB" auth/kubernetes/role/nextcloud \
+#         bound_service_account_names=nextcloud-sa \
+#         bound_service_account_namespaces=nextcloud \
+#         policies=nextcloud-access \
+#         ttl=1h
 
-    # bao write -address="$ADDRESS_OB" auth/kubernetes/role/nocodb \
-    #     bound_service_account_names=nocodb-sa \
-    #     bound_service_account_namespaces=nocodb \
-    #     policies=nocodb-access \
-    #     ttl=1h
+#     bao write -address="$ADDRESS_OB" auth/kubernetes/role/databases \
+#         bound_service_account_names=databases-sa \
+#         bound_service_account_namespaces=databases \
+#         policies=databases-access \
+#         ttl=1h

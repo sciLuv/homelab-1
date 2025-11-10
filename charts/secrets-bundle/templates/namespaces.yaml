@@ -1,0 +1,13 @@
+{{- range .Values.namespaces }}
+{{- $ns := . -}}
+{{- $existing := lookup "v1" "Namespace" "" $ns }}
+{{- if not $existing }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+---
+{{- end }}
+{{- end }}
