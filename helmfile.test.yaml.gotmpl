@@ -100,6 +100,22 @@ environments:
           version: 0.14.0
           namespace: "openbao"
           createNamespace: true
+        minio-operator:
+          enabled: true
+          labels:
+            env: default
+          name: "minio-operator"
+          chart: minio/operator
+          namespace: "minio-operator"
+          createNamespace: true
+        minio:
+          enabled: true
+          labels:
+            env: default
+          name: "minio"
+          chart: minio/tenant
+          namespace: "minio"
+          createNamespace: true
 # ----
 # specific releases for different environments
 # ----
@@ -145,6 +161,8 @@ repositories:
     url: https://charts.jetstack.io
   - name: openbao
     url: https://openbao.github.io/openbao-helm
+  - name: minio
+    url: https://operator.min.io/
 
 {{ $releases := .Values.releases }}
 releases:
@@ -212,6 +230,9 @@ releases:
     {{ end }}
     {{if eq $name "postgres-operator"}}
       - external-secrets/secrets-bundle
+    {{ end }}
+    {{ if eq $name "minio" }}
+      - minio-operator/minio-operator
     {{ end }}
     {{if eq $name "postgres-db"}}
       - databases/postgres-operator
