@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-cnpg-bucket
+  namespace: minio
+  labels:
+    app: minio-bucket-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: bucket-init
+          image: minio/mc
+          command: ["/bin/sh", "-c"]
+          args: 
+            - |
+              echo "Waiting for MinIO API..."
+              until mc alias set minio http://minio.minio.svc.cluster.local minio minio123; do
+                echo "MinIO not ready yet..."
+                sleep 2
+              done
+
+              echo "Creating bucket cnpg-backups"
+              mc mb --ignore-existing minio/cnpg-backups
+
+              echo "Bucket OK"

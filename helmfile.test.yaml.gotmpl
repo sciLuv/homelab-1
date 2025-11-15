@@ -116,6 +116,15 @@ environments:
           chart: minio/tenant
           namespace: "minio"
           createNamespace: true
+          hooks:
+            - events: ["postapply"]
+              showlogs: true
+              command: "kubectl"
+              args:
+                - apply
+                - -f
+                - "manifests/minio-job.yaml"
+
 # ----
 # specific releases for different environments
 # ----
@@ -247,7 +256,6 @@ releases:
     {{if eq $name "secrets-bundle"}}
       - external-secrets
     {{ end }}
-
 
 
 {{ end }}

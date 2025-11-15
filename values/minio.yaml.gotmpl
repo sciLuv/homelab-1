@@ -1,0 +1,30 @@
+{{- $prodUrl := printf "%s.%s" .Release.Name .Values.prodDomainName -}}
+{{- $devUrl := printf "%s.%s" .Release.Name .Values.devDomainSuffix -}}
+
+tenant:
+  certificate:
+    requestAutoCert: false
+
+ingress:
+  api:
+    enabled: true
+    {{- if .Values.isProd }}
+    ingressClassName: traefik
+    {{- else }}
+    ingressClassName: "ingress-controller"
+    {{- end }}
+    {{- if .Values.isProd }}
+    host: {{ $prodUrl }}
+    {{- else }}
+    host: {{ $devUrl }}
+    {{- end }}
+  console:
+    enabled: true
+    {{- if .Values.isProd }}
+    ingressClassName: traefik
+    {{- else }}
+    ingressClassName: "ingress-controller"
+    {{- end }}
+    host: minio-console.test
+
+

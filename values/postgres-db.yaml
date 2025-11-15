@@ -33,6 +33,26 @@ cluster:
     pg_hba:
       - hostssl all all 10.244.0.0/16 scram-sha-256
 
-# backups:
-#   enabled: true
+backups:
+  enabled: true
+  provider: s3
+  endpointURL: "myminio-hl.minio.svc.cluster.local:9000"
+  destinationPath: "s3://cnpg-backups/postgres"
+
+  s3:
+    bucket: "cnpg-backups"
+    path: "/postgres/"
+    region: "us-east-1"
+    accessKey: "minio"
+    secretKey: "minio123"
+
+  secret:
+    create: true
+    name: cnpg-backup-creds
+
+  scheduledBackups:
+    - name: hourly
+      schedule: "0 * * * *"
+      method: barmanObjectStore
+
   
