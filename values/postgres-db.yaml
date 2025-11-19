@@ -1,24 +1,26 @@
-cluster: 
+mode: standalone
+
+cluster:
   instances: 1
+
   initdb:
     database: nextcloud
     owner: nextcloud
     postInitSQL:
       - CREATE EXTENSION IF NOT EXISTS vector;
+
   storage:
     size: 4Gi
 
   resources:
-    # ressources garanties 
     requests:
       cpu: 250m
       memory: 512Mi
-    # ressources maximum  
     limits:
       cpu: 1000m
       memory: 2Gi
 
-  roles: 
+  roles:
     - name: nextcloud
       ensure: present
       comment: Nextcloud Database User
@@ -29,30 +31,56 @@ cluster:
 
   postgresql:
     parameters:
-      max_connections: "4"
+      max_connections: "100"
     pg_hba:
       - hostssl all all 10.244.0.0/16 scram-sha-256
 
 backups:
   enabled: true
+
+  # MinIO interne CNPG -> MinIO
   provider: s3
-  endpointURL: "myminio-hl.minio.svc.cluster.local:9000"
-  destinationPath: "s3://cnpg-backups/postgres"
+
+  # IMPORTANT : schéma + host + port
+  endpointURL: "http://myminio-hl.minio.svc.cluster.local:9000"
+
+  # On laisse le chart générer s3://<bucket><path>
+  # -> s3://cnpg-backups/postgres/
+  destinationPath: ""
 
   s3:
     bucket: "cnpg-backups"
     path: "/postgres/"
     region: "us-east-1"
-    accessKey: "minio"
+    accessKey: "minio"      # à remplacer par un user dédié MinIO plus tard
     secretKey: "minio123"
+    inheritFromIAMRole: false
+
+  endpointCA:
+    create: false
+    name: ""
+    key: ""
+    value: ""
 
   secret:
     create: true
     name: cnpg-backup-creds
 
+  wal:
+    compression: gzip
+    encryption: ""
+    maxParallel: 1
+
+  data:
+    compression: gzip
+    encryption: ""
+    jobs: 2
+
+  # Cron agressif pour valider rapidement que ça marche
   scheduledBackups:
-    - name: hourly
-      schedule: "0 * * * *"
+    - name: quick-test
+      schedule: "0 0 2 * * *" 
+      backupOwnerReference: self
       method: barmanObjectStore
 
-  
+  retentionPolicy: "30d"

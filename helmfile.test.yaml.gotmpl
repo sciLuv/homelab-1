@@ -117,7 +117,7 @@ environments:
           namespace: "minio"
           createNamespace: true
           hooks:
-            - events: ["postapply"]
+            - events: ["postsync"]
               showlogs: true
               command: "kubectl"
               args:
