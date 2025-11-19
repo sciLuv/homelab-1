@@ -38,14 +38,11 @@ cluster:
 backups:
   enabled: true
 
-  # MinIO interne CNPG -> MinIO
   provider: s3
 
-  # IMPORTANT : schéma + host + port
   endpointURL: "http://myminio-hl.minio.svc.cluster.local:9000"
 
-  # On laisse le chart générer s3://<bucket><path>
-  # -> s3://cnpg-backups/postgres/
+
   destinationPath: ""
 
   s3:
@@ -76,7 +73,6 @@ backups:
     encryption: ""
     jobs: 2
 
-  # Cron agressif pour valider rapidement que ça marche
   scheduledBackups:
     - name: quick-test
       schedule: "0 0 2 * * *" 
